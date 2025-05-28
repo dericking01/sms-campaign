@@ -1,0 +1,19 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  sms-campaign:
+    build: .
+    environment:
+      - SMS_GATEWAY_URL=http://192.168.1.200:6013/cgi-bin/sendsms
+      - SMS_GATEWAY_USER=afya
+      - SMS_GATEWAY_PASS=Afya4017
+      - DLR_CALLBACK_URL=http://sms-campaign/api/dlr
+    volumes:
+      - ./data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+    restart: unless-stopped

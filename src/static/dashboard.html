@@ -1,0 +1,98 @@
+<!-- src/static/dashboard.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SMS Campaign Progress</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .dashboard { max-width: 1000px; margin: 0 auto; }
+        .progress-container { display: flex; margin-bottom: 20px; }
+        .progress-bar { flex-grow: 1; margin-right: 10px; }
+        .progress-text { width: 150px; text-align: right; }
+        #progressChart { margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <h1>SMS Campaign Progress</h1>
+        <div class="progress-container">
+            <div class="progress-bar">
+                <progress id="progressBar" value="0" max="100"></progress>
+            </div>
+            <div class="progress-text">
+                <span id="progressText">0% (0/0)</span>
+            </div>
+        </div>
+        <div>
+            <canvas id="progressChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const campaignId = new URLSearchParams(window.location.search).get('campaign_id');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws/progress/${campaignId}`;
+        
+        // Chart setup
+        const ctx = document.getElementById('progressChart').getContext('2d');
+        const progressChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Messages Sent',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // WebSocket connection
+        const socket = new WebSocket(wsUrl);
+        
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'progress_update') {
+                const { sent, total, percentage } = data.data;
+                
+                // Update progress bar
+                progressBar.value = percentage;
+                progressText.textContent = `${percentage.toFixed(1)}% (${sent}/${total})`;
+                
+                // Update chart
+                const now = new Date().toLocaleTimeString();
+                progressChart.data.labels.push(now);
+                progressChart.data.datasets[0].data.push(sent);
+                
+                // Limit to last 20 points
+                if (progressChart.data.labels.length > 20) {
+                    progressChart.data.labels.shift();
+                    progressChart.data.datasets[0].data.shift();
+                }
+                
+                progressChart.update();
+            }
+        };
+
+        // Keep connection alive
+        setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send('ping');
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
